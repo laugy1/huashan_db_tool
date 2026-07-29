@@ -1,0 +1,62 @@
+# huashan_db_tool 範例設定檔
+# 支援 ${ENV_VAR} 變數展開，敏感資訊建議放在環境變數中。
+
+mssql:
+  server: "localhost"
+  port: 1433
+  database: "huashan"
+  username: "sa"
+  password: "${MSSQL_PASSWORD}"
+  # encrypt 可為 "false" / "true" / "disable" / "strict"
+  encrypt: "false"
+  trust_server_certificate: true
+  connection_timeout_seconds: 30
+
+mongodb:
+  # 二擇一：直接給 URI，或拆分 host/port/auth
+  uri: "mongodb://localhost:27017"
+  # host: "localhost"
+  # port: 27017
+  # username: "admin"
+  # password: "${MONGO_PASSWORD}"
+  # auth_database: "admin"
+  database: "huashan"
+
+# 所有 migration 共用的預設值
+defaults:
+  batch_size: 1000
+
+migrations:
+  # 範例 1：1:1 直接搬運某張表
+  - name: products
+    target_collection: products
+    query: |
+      SELECT id, sku, name, price, created_at
+      FROM dbo.products
+    rename:
+      id: _id        # 把 SQL 的 id 對應到 MongoDB 的 _id
+    truncate: true   # 寫入前清空目標 collection
+    batch_size: 2000
+
+  # 範例 2：join 兩張表並把 orders 嵌入 user 文件
+  # 注意 ORDER BY 必須與 group_by 一致，這樣連續同組才會被聚合成一筆文件。
+  - name: users_with_orders
+    target_collection: users
+    query: |
+      SELECT
+        u.id          AS user_id,
+        u.name        AS user_name,
+        u.email       AS email,
+        o.id          AS order_id,
+        o.amount      AS amount,
+        o.created_at  AS ordered_at
+      FROM dbo.users u
+      LEFT JOIN dbo.orders o ON o.user_id = u.id
+      ORDER BY u.id
+    # 父文件的鍵；連續多筆同 user_id 的 row 會合併成同一份文件
+    group_by: [user_id, user_name, email]
+    # 不在 group_by 中的欄位會以子文件型式塞進這個陣列
+    embed_as: orders
+    rename:
+      user_id: _id
+    truncate: true

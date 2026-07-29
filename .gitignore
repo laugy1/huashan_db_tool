@@ -1,0 +1,9 @@
+/huashan_db_tool
+/bin/
+/dist/
+config.yaml
+*.local.yaml
+.env
+.env.*
+.DS_Store
+*.log
