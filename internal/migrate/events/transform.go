@@ -3,7 +3,9 @@ package events
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,14 +15,14 @@ import (
 const mediaBaseURL = "https://media.huashan1914.com/WebUPD"
 
 type siteProfile struct {
-	SiteID           int
-	SitePath         string
-	Collection       string
-	SlugPrefix       string
-	PostMetaID       string
-	PostMetaName     string
-	PostMetaPrefix   string
-	CategoryRelated  string // category.related，對應 events / umaytheater_events
+	SiteID          int
+	SitePath        string
+	Collection      string
+	SlugPrefix      string
+	PostMetaID      string
+	PostMetaName    string
+	PostMetaPrefix  string
+	CategoryRelated string // category.related，對應 events / umaytheater_events
 }
 
 var siteProfiles = map[int]siteProfile{
@@ -47,22 +49,22 @@ var siteProfiles = map[int]siteProfile{
 }
 
 type rawRow struct {
-	EventID         any
-	SiteID          any
-	Title           any
-	DateStart       any
-	DateEnd         any
-	TimeStart       any
-	TimeEnd         any
-	TimeDesc        any
-	CreateTime      any
-	MenuSN          any
-	Contents        any
-	CategoriesJSON  any
-	VenuesJSON      any
-	OrganizersJSON  any
-	ObjectsJSON     any
-	ImagesJSON      any
+	EventID        any
+	SiteID         any
+	Title          any
+	DateStart      any
+	DateEnd        any
+	TimeStart      any
+	TimeEnd        any
+	TimeDesc       any
+	CreateTime     any
+	MenuSN         any
+	ParagraphsJSON any
+	CategoriesJSON any
+	VenuesJSON     any
+	OrganizersJSON any
+	ObjectsJSON    any
+	ImagesJSON     any
 }
 
 func buildDocument(row map[string]any, profile siteProfile, catIdx *CategoryIndex) (map[string]any, error) {
@@ -77,7 +79,7 @@ func buildDocument(row map[string]any, profile siteProfile, catIdx *CategoryInde
 		TimeDesc:       row["time_desc"],
 		CreateTime:     row["create_time"],
 		MenuSN:         row["menu_sn"],
-		Contents:       row["contents"],
+		ParagraphsJSON: row["paragraphs_json"],
 		CategoriesJSON: row["categories_json"],
 		VenuesJSON:     row["venues_json"],
 		OrganizersJSON: row["organizers_json"],
@@ -105,6 +107,10 @@ func buildDocument(row map[string]any, profile siteProfile, catIdx *CategoryInde
 	images, err := parseImageList(r.ImagesJSON)
 	if err != nil {
 		return nil, fmt.Errorf("images_json: %w", err)
+	}
+	paragraphs, err := parseParagraphs(r.ParagraphsJSON)
+	if err != nil {
+		return nil, fmt.Errorf("paragraphs_json: %w", err)
 	}
 
 	menuSN := asString(r.MenuSN)
@@ -150,7 +156,7 @@ func buildDocument(row map[string]any, profile siteProfile, catIdx *CategoryInde
 				"description": asString(r.TimeDesc),
 			},
 			"event_content": map[string]any{
-				"description":       sanitizeEventHTML(asString(r.Contents)),
+				"description":       sanitizeEventHTML(mergeParagraphsHTML(paragraphs)),
 				"hero_img":          []any{},
 				"square_hero_image": []any{},
 			},
@@ -233,6 +239,81 @@ func parseNameList(v any) ([]string, error) {
 		}
 	}
 	return out, nil
+}
+
+type paragraph struct {
+	ID       string
+	Title    string
+	Contents string
+	Sort     int64
+}
+
+type paragraphJSON struct {
+	ID       string `json:"id"`
+	Title    string `json:"title"`
+	Contents string `json:"contents"`
+	Sort     any    `json:"sort"`
+}
+
+func parseParagraphs(v any) ([]paragraph, error) {
+	if v == nil {
+		return nil, nil
+	}
+	raw, err := jsonBytes(v)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+
+	var items []paragraphJSON
+	if err := json.Unmarshal(raw, &items); err != nil {
+		return nil, err
+	}
+	out := make([]paragraph, 0, len(items))
+	for _, it := range items {
+		sortVal, _ := asInt64(it.Sort)
+		out = append(out, paragraph{
+			ID:       it.ID,
+			Title:    it.Title,
+			Contents: it.Contents,
+			Sort:     sortVal,
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Sort != out[j].Sort {
+			return out[i].Sort < out[j].Sort
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out, nil
+}
+
+func mergeParagraphsHTML(paragraphs []paragraph) string {
+	var b strings.Builder
+	for _, p := range paragraphs {
+		title := strings.TrimSpace(p.Title)
+		contents := strings.TrimSpace(p.Contents)
+		if title == "" && contents == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		if title != "" {
+			b.WriteString("<h2>")
+			b.WriteString(html.EscapeString(title))
+			b.WriteString("</h2>")
+			if contents != "" {
+				b.WriteByte('\n')
+			}
+		}
+		if contents != "" {
+			b.WriteString(p.Contents)
+		}
+	}
+	return b.String()
 }
 
 func parseImageList(v any) ([]string, error) {

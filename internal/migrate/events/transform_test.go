@@ -73,3 +73,88 @@ func TestBuildImageURL(t *testing.T) {
 		t.Fatalf("buildImageURL() = %q, want %q", got, want)
 	}
 }
+
+func TestParseParagraphsSortsBySortThenID(t *testing.T) {
+	raw := `[
+		{"id":"25081517281340986","title":"【活動資訊】","contents":"<p>資訊</p>","sort":2},
+		{"id":"25081517184004447","title":"放影展","contents":"<p>開頭</p>","sort":0},
+		{"id":"25081517493638713","title":"【活動簡介】","contents":"<p>簡介</p>","sort":1}
+	]`
+	got, err := parseParagraphs(raw)
+	if err != nil {
+		t.Fatalf("parseParagraphs() error = %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("len = %d, want 3", len(got))
+	}
+	wantIDs := []string{"25081517184004447", "25081517493638713", "25081517281340986"}
+	for i, id := range wantIDs {
+		if got[i].ID != id {
+			t.Fatalf("got[%d].ID = %q, want %q", i, got[i].ID, id)
+		}
+	}
+}
+
+func TestMergeParagraphsHTML(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []paragraph
+		want string
+	}{
+		{
+			name: "empty",
+			in:   nil,
+			want: "",
+		},
+		{
+			name: "skip blank paragraphs",
+			in:   []paragraph{{Title: "  ", Contents: "\n"}},
+			want: "",
+		},
+		{
+			name: "title only",
+			in:   []paragraph{{Title: "【活動簡介】"}},
+			want: "<h2>【活動簡介】</h2>",
+		},
+		{
+			name: "contents only",
+			in:   []paragraph{{Contents: "<p>開頭</p>"}},
+			want: "<p>開頭</p>",
+		},
+		{
+			name: "escape title html",
+			in:   []paragraph{{Title: `A <b>B</b> & C`}},
+			want: "<h2>A &lt;b&gt;B&lt;/b&gt; &amp; C</h2>",
+		},
+		{
+			name: "multiple sections",
+			in: []paragraph{
+				{Title: "放影展", Contents: "<p>開頭</p>"},
+				{Title: "【活動簡介】", Contents: "<p>簡介</p>"},
+				{Title: "【活動資訊】", Contents: "<p>資訊</p>"},
+			},
+			want: "<h2>放影展</h2>\n<p>開頭</p>\n<h2>【活動簡介】</h2>\n<p>簡介</p>\n<h2>【活動資訊】</h2>\n<p>資訊</p>",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mergeParagraphsHTML(tt.in)
+			if got != tt.want {
+				t.Fatalf("mergeParagraphsHTML() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSanitizeMergedParagraphs(t *testing.T) {
+	paras := []paragraph{
+		{Title: "放影展", Contents: `<p style="text-align:center">開頭</p>`},
+		{Title: "【活動簡介】", Contents: `<p><font size="3">簡介</font></p>`},
+	}
+	got := sanitizeEventHTML(mergeParagraphsHTML(paras))
+	want := "<h2>放影展</h2>\n<p>開頭</p>\n<h2>【活動簡介】</h2>\n<p>簡介</p>"
+	if got != want {
+		t.Fatalf("sanitize merged = %q, want %q", got, want)
+	}
+}

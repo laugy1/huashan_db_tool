@@ -15,11 +15,16 @@ SELECT
   e.CreateTime  AS create_time,
   m.SN          AS menu_sn,
   (
-    SELECT TOP 1 p.Contents
+    SELECT
+      CAST(p.ID AS varchar(32)) AS id,
+      p.Title AS title,
+      p.Contents AS contents,
+      p.Sort AS sort
     FROM Paragraph p
     WHERE p.SourceNo = e.ID
-    ORDER BY p.ID
-  ) AS contents,
+    ORDER BY p.Sort ASC, p.ID ASC
+    FOR JSON PATH
+  ) AS paragraphs_json,
   (
     SELECT et.Name AS name
     FROM EventToType ett
