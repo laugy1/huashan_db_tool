@@ -58,3 +58,19 @@ func TestExtractToken_nested(t *testing.T) {
 		t.Fatalf("got %q err %v", tok, err)
 	}
 }
+
+func TestExtractToken_rejectsHTML(t *testing.T) {
+	body := []byte("<!DOCTYPE html><html><head></head><body>login</body></html>")
+	tok, err := extractToken(body)
+	if err == nil || tok != "" {
+		t.Fatalf("expected error for HTML login page, got token %q err %v", tok, err)
+	}
+}
+
+func TestExtractToken_plainText(t *testing.T) {
+	body := []byte("  eyJhbGciOiJIUzI1NiJ9.abc.def  ")
+	tok, err := extractToken(body)
+	if err != nil || tok != "eyJhbGciOiJIUzI1NiJ9.abc.def" {
+		t.Fatalf("got %q err %v", tok, err)
+	}
+}

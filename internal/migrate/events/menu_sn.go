@@ -25,6 +25,18 @@ func collectionSite(siteID int) (sitePath string, ok bool) {
 	}
 }
 
+// defaultMenuSN is used when SQL MenuID is empty so a legacy image URL can still be built.
+func defaultMenuSN(sitePath string) string {
+	switch sitePath {
+	case "huashan1914":
+		return "exhibition"
+	case "umaytheater":
+		return "performance"
+	default:
+		return ""
+	}
+}
+
 func siteIDForCollection(collection string) (int, error) {
 	switch collection {
 	case "events":

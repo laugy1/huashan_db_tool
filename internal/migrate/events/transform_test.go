@@ -74,6 +74,18 @@ func TestBuildImageURL(t *testing.T) {
 	}
 }
 
+func TestDefaultMenuSN(t *testing.T) {
+	if got := defaultMenuSN("huashan1914"); got != "exhibition" {
+		t.Fatalf("defaultMenuSN(huashan1914) = %q", got)
+	}
+	if got := defaultMenuSN("umaytheater"); got != "performance" {
+		t.Fatalf("defaultMenuSN(umaytheater) = %q", got)
+	}
+	if got := defaultMenuSN("unknown"); got != "" {
+		t.Fatalf("defaultMenuSN(unknown) = %q", got)
+	}
+}
+
 func TestParseParagraphsSortsBySortThenID(t *testing.T) {
 	raw := `[
 		{"id":"25081517281340986","title":"【活動資訊】","contents":"<p>資訊</p>","sort":2},

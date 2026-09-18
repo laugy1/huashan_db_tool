@@ -115,7 +115,7 @@ func (c *Client) Upload(ctx context.Context, filename string, data []byte) ([]ma
 
 	var out uploadResponse
 	if err := json.Unmarshal(body, &out); err != nil {
-		return nil, fmt.Errorf("upload parse json: %w", err)
+		return nil, fmt.Errorf("upload parse json: %w; body=%s", err, truncate(string(body), 256))
 	}
 	if len(out.MetaList) == 0 {
 		return nil, fmt.Errorf("upload: empty metaList in response")
@@ -131,12 +131,12 @@ type uploadResponse struct {
 func extractToken(body []byte) (string, error) {
 	var m map[string]any
 	if err := json.Unmarshal(body, &m); err != nil {
-		// 部分後端只回傳純文字 token
+		// 部分後端只回傳純文字 token；拒絕 HTML / 空白，避免前端 SPA 被當成登入成功。
 		s := strings.TrimSpace(string(body))
-		if s != "" && !strings.HasPrefix(s, "{") {
+		if looksLikePlainToken(s) {
 			return s, nil
 		}
-		return "", fmt.Errorf("login parse json: %w", err)
+		return "", fmt.Errorf("login parse json: %w; body=%s", err, truncate(s, 256))
 	}
 	if t := findToken(m); t != "" {
 		return t, nil
@@ -196,6 +196,16 @@ func Download(ctx context.Context, imageURL string) ([]byte, string, error) {
 		filename = "image.jpg"
 	}
 	return data, filename, nil
+}
+
+func looksLikePlainToken(s string) bool {
+	if s == "" || strings.HasPrefix(s, "{") || strings.HasPrefix(s, "<") {
+		return false
+	}
+	if strings.ContainsAny(s, "<>\n") || len(s) > 4096 {
+		return false
+	}
+	return true
 }
 
 func truncate(s string, n int) string {

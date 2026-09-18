@@ -133,6 +133,9 @@ func runImagesCollection(ctx context.Context, cfg *config.EventsImagesConfig, cm
 		if eid, ok := legacyEventID(docMap); ok {
 			fallbackSN = menuSNMap[eid]
 		}
+		if fallbackSN == "" {
+			fallbackSN = defaultMenuSN(sitePath)
+		}
 		legacy := legacyImageEntries(doc["_legacy_images"], sitePath, fallbackSN)
 		if len(legacy) == 0 {
 			continue
