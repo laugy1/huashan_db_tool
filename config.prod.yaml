@@ -1,0 +1,48 @@
+# 實際使用設定檔（已加入 .gitignore，不會進版控）
+# 密碼透過環境變數注入，請執行前先：
+#   export MSSQL_PASSWORD='...'
+#   export MONGO_PASSWORD='...'
+
+mssql:
+  server: "192.168.50.162"
+  port: 1433
+  database: "huashan"
+  username: "sa"
+  password: "aB77099890bbcc@"
+  encrypt: "false"
+  trust_server_certificate: true
+  connection_timeout_seconds: 30
+
+# mongodb:
+#   host: "localhost"
+#   port: 27017
+#   username: "es_admin"
+#   password: "${MONGO_PASSWORD}"
+#   auth_database: "admin"
+#   database: "ES_CMS"
+
+# 生產環境 MongoDB 設定 mongodb://es_admin:IHWIAecyKfLNLO3tsJLDNmemYyYB1zv2@127.0.0.1:27020/?authSource=admin
+mongodb:
+  host: "127.0.0.1"
+  port: 27020
+  username: "es_admin"
+  password: "IHWIAecyKfLNLO3tsJLDNmemYyYB1zv2"
+  auth_database: "admin"
+  database: "ES_CMS"
+
+# 活動資料階段一遷移（--task events）
+events:
+  truncate: false
+  batch_size: 500
+
+# 活動圖片階段二（--task events-images）
+events_images:
+  mode: upload          # lookup：對照 media 既有檔案；upload：下載舊站圖並上傳 CMS
+  reupload: false
+  remove_legacy_images: true
+
+cms:
+  # 必須是後端 API 根路徑（含 /dcsn），不能填前端網域，否則 /login 會回 HTML。
+  base_url: "https://cms.huashan1914.com/dcsn"
+  username: "developer"
+  password: "aB77099890bbcc@"
